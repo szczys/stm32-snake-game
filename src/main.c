@@ -3,9 +3,13 @@
 #include "main.h"
 #include "STM32-Debounce.h"
 #include <math.h>
+#include "font5x8.h"
 
 #define BACKGROUND 0xFF
 #define FOREGROUND 0x00
+
+uint8_t font_cursor_x = 15;
+uint8_t font_cursor_y = 40;
 
 typedef struct {
   uint8_t x;
@@ -20,6 +24,50 @@ int8_t dirX = 1;
 //Variables
 static __IO uint32_t TimingDelay;
 volatile uint8_t move_tick = 0;
+
+void Write_Char(unsigned char letter, unsigned char fgcolor, unsigned char bgcolor)		//Function that writes one character to display
+{
+  //TODO: Prevent non-valid characters from crashing program
+  
+  //Setup display to write one char:
+  LCD_Out(0x2A, 1);
+  LCD_Out(font_cursor_x, 0);
+  LCD_Out(font_cursor_x+5, 0);
+  LCD_Out(0x2B, 1);
+  LCD_Out(font_cursor_y, 0);
+  LCD_Out(font_cursor_y+7, 0);
+  LCD_Out(0x2C, 1);
+  
+  //letters come from font5x8[] in progmem (font5x8.h)
+  letter -= 32;						//Adjust char value to match our font array indicies
+  
+  unsigned char temp[5];
+  for (unsigned char i=0; i<5; i++)				//Read one column of char at a time
+  {
+    temp[i] = font5x8[(5 * letter) + i];	//Get column from progmem
+  }
+  
+  for (unsigned char j=0; j<8; j++)						//Cycle through each bit in column
+  {
+    LCD_Out(bgcolor, 0);
+    for (unsigned char k=0; k<5; k++)
+    {
+	    if (temp[k] & 1<<j) LCD_Out(fgcolor, 0);
+	    else LCD_Out(bgcolor, 0);
+    }
+  }
+}
+
+void Write_String(char* myString, unsigned char fgcolor, unsigned char bgcolor)
+{
+  while (*myString)
+  {
+    Write_Char(*myString,fgcolor,bgcolor);
+    font_cursor_x += 6; //advance cursor
+    ++myString;
+  }
+}
+
 
 void _delay_ms(__IO uint32_t nTime)
 {
@@ -49,7 +97,7 @@ void SysTick_Handler(void) {
   switch (tick++) {
     case 100:
       tick = 0;
-      GPIOC->ODR ^= (1 << 8);
+      //GPIOC->ODR ^= (1 << 8);
       move_tick = 1;
       break;
   }
@@ -77,6 +125,7 @@ int main(void)
   head.x = 10;
   head.y = 10;
   Draw_Box(0,0,97,66,BACKGROUND);
+  Write_String("GAME OVER",FOREGROUND,BACKGROUND);
   while(1) {
     if (move_tick) {
       Draw_Box(head.x,head.y,head.x+1,head.y+1,BACKGROUND); //Erase
