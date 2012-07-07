@@ -2,7 +2,6 @@
 #include "3595-LCD-Driver.h"
 #include "main.h"
 #include "STM32-Debounce.h"
-#include <math.h>
 #include "font5x8.h"
 
 #define BACKGROUND 0xFF
@@ -16,8 +15,8 @@ typedef struct {
   uint8_t y;
 } point;
 
-point head;
-int8_t dirY = 1;
+point corners[400];
+int8_t dirY = 0;
 int8_t dirX = 1;
 
 
@@ -110,10 +109,32 @@ void SysTick_Handler(void) {
   }
 }
 
-int main(void)
+void change_direction(uint8_t new_dir)
 {
-  SysTick_Config(SystemCoreClock/1000);
-  
+  switch (new_dir) {
+    case 1:
+      dirX = -1;
+      dirY = 0;
+      break;
+    case 2:
+      dirX = 0;
+      dirY = -1;
+      break;
+    case 3:
+      dirX = 1;
+      dirY = 0;
+      break;
+    case 4:
+      dirX = 0;
+      dirY = 1;
+      break;
+    }
+}
+
+int main(void)
+{ 
+  unsigned char change_dir = 0;
+
   SPI_Config();
 
   //Setup output for blinking blue LED  
@@ -121,27 +142,46 @@ int main(void)
   GPIOC->MODER |= (1<<16);
   GPIOC->PUPDR |= (1<<8) | (1<<4) | (1<<2) | (1<<0); //Pull-up resistor
   
+  SysTick_Config(SystemCoreClock/1000);
+  
   LCD_init();
-  head.x = 10;
-  head.y = 10;
+  uint16_t tail = 0;
+  uint16_t head = 1;
+  
+  corners[head].x = 10;
+  corners[head].y = 10;
+  
   Draw_Box(0,0,97,66,BACKGROUND);
   Write_String("GAME OVER",FOREGROUND,BACKGROUND);
+  clear_keys(REPEAT_MASK); //Clear false reading due to active high buttons
   while(1) {
     if (move_tick) {
-      Draw_Box(head.x,head.y,head.x+1,head.y+1,BACKGROUND); //Erase
+      //TODO: Draw_Box(corners[head].x,corners[head].y,corners[head].x+1,corners[head].y+1,BACKGROUND); //Erase
+      
+      //Change direction
+      if (change_dir) {
+        change_direction(change_dir);
+        change_dir = 0;
+      }
+      /*
       //Move
-      if (head.x == 0) dirX = 1;
-      if (head.x == PAGE_SIZE) dirX = -1;
-      if (head.y == 0) dirY = 1;
-      if (head.y == ROW_SIZE) dirY = -1;
-      head.x += dirX;
-      head.y += dirY;
-      Draw_Box(head.x,head.y,head.x+1,head.y+1,FOREGROUND); //Redraw
+      if (corners[head].x == 0) dirX = 1;
+      if (corners[head].x == PAGE_SIZE) dirX = -1;
+      if (corners[head].y == 0) dirY = 1;
+      if (corners[head].y == ROW_SIZE) dirY = -1;
+      */
+      corners[head].x += dirX;
+      corners[head].y += dirY;
+      Draw_Box(corners[head].x,corners[head].y,corners[head].x+1,corners[head].y+1,FOREGROUND); //Redraw
       move_tick = 0;
     }
-    if (get_key_press(1<<KEY0)) { dirX = -1; dirY = 0; }
-    if (get_key_press(1<<KEY1)) { dirX = 0; dirY = -1; }
-    if (get_key_press(1<<KEY2)) { dirX = 1; dirY = 0; }
-    if (get_key_press(1<<KEY3)) { dirX = 0; dirY = 1; }
+    if (get_key_press(1<<KEY0)) 
+      { if (dirX != 1) change_dir = 1; } // Left { dirX = -1; dirY = 0; }
+    if (get_key_press(1<<KEY1)) 
+      { if (dirY != 1) change_dir = 2; } // Up { dirX = 0; dirY = -1; }
+    if (get_key_press(1<<KEY2)) 
+      { if (dirX != -1) change_dir = 3; } // Right { dirX = 1; dirY = 0; }
+    if (get_key_press(1<<KEY3))
+      { if (dirY != -1) change_dir = 4; } // Down { dirX = 0; dirY = 1; }
   }
 }

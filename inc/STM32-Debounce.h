@@ -14,10 +14,11 @@
 #define KEY3		4 //Down
 
 //Repeat
-#define REPEAT_MASK   (1<<KEY0)   // repeat: key1, key2 
+#define REPEAT_MASK   ((1<<KEY3) | (1<<KEY2) | (1<<KEY1) | (1<<KEY0))   // repeat: key1, key2 
 #define REPEAT_START  50          // after 500ms 
 #define REPEAT_NEXT   20          // every 200ms
 
+void clear_keys(unsigned char key_mask);
 unsigned char get_key_press( unsigned char key_mask );
 unsigned char get_key_rpt( unsigned char key_mask );
 unsigned char get_key_short( unsigned char key_mask ); 

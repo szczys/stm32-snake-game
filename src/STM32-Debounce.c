@@ -5,6 +5,19 @@ volatile uint16_t key_state;
 volatile uint16_t key_rpt;
 
 /*--------------------------------------------------------------------------
+  FUNC: 7/7/12 - Used to initialize active-high buttons
+  PARAMS: A mask of the keys that are idle high
+  RETURNS: None
+  NOTE: Buttons with pull-down resistors will register a false reading
+    as soon as the interrupt service function runs. This will clear that
+    first false reading
+--------------------------------------------------------------------------*/
+void clear_keys(unsigned char key_mask)
+{
+  key_press ^= key_mask;
+}
+
+/*--------------------------------------------------------------------------
   FUNC: 8/1/11 - Used to read debounced button presses
   PARAMS: A keymask corresponding to the pin for the button you with to poll
   RETURNS: A keymask where any high bits represent a button press
