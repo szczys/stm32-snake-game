@@ -4,11 +4,13 @@
 #include "STM32-Debounce.h"
 #include "font5x8.h"
 #include "98x67-snake.h"
+#include <stdlib.h>
 
 #define BACKGROUND 0xFF
 #define FOREGROUND 0x00
 #define GAME_OVER_FONT_COLOR  red
 #define GAME_OVER_BD_COLOR  BACKGROUND
+#define FRUIT_COLOR red
 
 #define SNAKE_GIRTH   2
 #define GAMEBOARD_X   (PAGE_SIZE+1)/SNAKE_GIRTH
@@ -147,7 +149,8 @@ void SysTick_Handler(void) {
   if (game_running)
   {
     switch (tick++) {
-      case 200:
+      //TODO: Add speed element to game
+      case 150:
         tick = 0;
         move_tick = 1;
         break;
@@ -194,6 +197,13 @@ uint8_t neighbors(point node1, point node2)
 {
   if ((absolute_difference(node1.x,node2.x) == 1) || (absolute_difference(node1.y,node2.y) == 1)) return 1;
   return 0;
+}
+
+void make_fruit(void) {
+  uint8_t randX = (uint8_t)(rand()%(GAMEBOARD_X));
+  uint8_t randY = (uint8_t)(rand()%(GAMEBOARD_Y));
+  //TODO: Make sure fruit isn't overlapping the snake.
+  Draw_Box(randX*SNAKE_GIRTH,randY*SNAKE_GIRTH,(randX*SNAKE_GIRTH)+SNAKE_GIRTH-1,(randY*SNAKE_GIRTH)+SNAKE_GIRTH-1,FRUIT_COLOR);
 }
 
 void game_over(void)
@@ -312,6 +322,8 @@ void snake_init(void)
   Draw_Box(0,0,PAGE_SIZE,ROW_SIZE,black);
   Draw_Box(0,0,PAGE_SIZE-((PAGE_SIZE+1)%SNAKE_GIRTH),ROW_SIZE-((ROW_SIZE+1)%SNAKE_GIRTH),BACKGROUND);
   Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND);
+  srand((uint16_t)SysTick->VAL);
+  make_fruit();
 }
 
 int main(void)
