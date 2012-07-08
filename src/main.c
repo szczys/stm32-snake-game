@@ -9,6 +9,8 @@
 
 uint8_t font_cursor_x = 15;
 uint8_t font_cursor_y = 40;
+uint16_t tail = 0;
+uint16_t head = 1;
 
 typedef struct {
   uint8_t x;
@@ -131,9 +133,63 @@ void change_direction(uint8_t new_dir)
     }
 }
 
+uint8_t absolute_difference(uint8_t a, uint8_t b)
+{
+  int16_t unknown = (int16_t)a - b;
+  return (uint8_t)(unknown<0?0-unknown:unknown); 
+}
+
+uint8_t neighbors(point node1, point node2)
+{
+  if ((absolute_difference(node1.x,node2.x) == 1) || (absolute_difference(node1.y,node2.y) == 1)) return 1;
+  return 0;
+}
+
+void move_head(uint8_t new_dir)
+{
+  if (new_dir)
+  {
+    //Copy head to new position
+    ++head; //increment head
+    corners[head].x = corners[head-1].x;
+    corners[head].y = corners[head-1].y;
+    change_direction(new_dir);  //change direction
+  }
+  
+  corners[head].x += dirX;
+  corners[head].y += dirY;
+}
+
+void follow_tail(void)
+{
+
+  //is tail a neighbor of next?
+  if (neighbors(corners[tail],corners[tail+1]))
+  {
+    ++tail;
+  }
+  
+  //find which axis tail and next have in common
+  else
+  {
+    if (corners[tail].x == corners[tail+1].x)
+    {
+      //These points have the same X, so make adjustment to the Y
+      if ((corners[tail].y - corners[tail+1].y) < 0) corners[tail].y += 1;
+      else corners[tail].y -= 1; 
+    }
+    else
+    {
+      //These points have the same Y, so make adjustment to the X
+      if ((corners[tail].x - corners[tail+1].x) < 0) corners[tail].x += 1;
+      else corners[tail].x -= 1; 
+    }
+  }
+}
+
 int main(void)
 { 
-  unsigned char change_dir = 0;
+  uint8_t change_dir = 0;
 
   SPI_Config();
 
@@ -145,24 +201,19 @@ int main(void)
   SysTick_Config(SystemCoreClock/1000);
   
   LCD_init();
-  uint16_t tail = 0;
-  uint16_t head = 1;
   
-  corners[head].x = 10;
+  corners[head].x = 40;
   corners[head].y = 10;
+  corners[tail].x = 10;
+  corners[tail].y = 10;
   
   Draw_Box(0,0,97,66,BACKGROUND);
+  Draw_Box(corners[tail].x,corners[tail].y,corners[head].x+1,corners[head].y+1,FOREGROUND); //FIXME thickness hack
   Write_String("GAME OVER",FOREGROUND,BACKGROUND);
   clear_keys(REPEAT_MASK); //Clear false reading due to active high buttons
   while(1) {
     if (move_tick) {
-      //TODO: Draw_Box(corners[head].x,corners[head].y,corners[head].x+1,corners[head].y+1,BACKGROUND); //Erase
-      
-      //Change direction
-      if (change_dir) {
-        change_direction(change_dir);
-        change_dir = 0;
-      }
+           
       /*
       //Move
       if (corners[head].x == 0) dirX = 1;
@@ -170,18 +221,22 @@ int main(void)
       if (corners[head].y == 0) dirY = 1;
       if (corners[head].y == ROW_SIZE) dirY = -1;
       */
-      corners[head].x += dirX;
-      corners[head].y += dirY;
+      //corners[head].x += dirX;
+      //corners[head].y += dirY;
+
+      move_head(change_dir);
       Draw_Box(corners[head].x,corners[head].y,corners[head].x+1,corners[head].y+1,FOREGROUND); //Redraw
+      Draw_Box(corners[tail].x,corners[tail].y,corners[tail].x+1,corners[tail].y+1,BACKGROUND); //Erase
+      follow_tail();
       move_tick = 0;
     }
     if (get_key_press(1<<KEY0)) 
-      { if (dirX != 1) change_dir = 1; } // Left { dirX = -1; dirY = 0; }
+      { if (dirX == 0) change_dir = 1; } // Left { dirX = -1; dirY = 0; }
     if (get_key_press(1<<KEY1)) 
-      { if (dirY != 1) change_dir = 2; } // Up { dirX = 0; dirY = -1; }
+      { if (dirY == 0) change_dir = 2; } // Up { dirX = 0; dirY = -1; }
     if (get_key_press(1<<KEY2)) 
-      { if (dirX != -1) change_dir = 3; } // Right { dirX = 1; dirY = 0; }
+      { if (dirX == 0) change_dir = 3; } // Right { dirX = 1; dirY = 0; }
     if (get_key_press(1<<KEY3))
-      { if (dirY != -1) change_dir = 4; } // Down { dirX = 0; dirY = 1; }
+      { if (dirY == 0) change_dir = 4; } // Down { dirX = 0; dirY = 1; }
   }
 }
