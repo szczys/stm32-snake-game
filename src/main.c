@@ -3,6 +3,7 @@
 #include "main.h"
 #include "STM32-Debounce.h"
 #include "font5x8.h"
+#include "98x67-snake.h"
 
 #define BACKGROUND 0xFF
 #define FOREGROUND 0x00
@@ -275,6 +276,22 @@ uint8_t collision(void)
   return 0;
 }
 
+void draw_graphic(void) {
+
+  LCD_Out(0x2A, 1);
+  LCD_Out(0, 0);
+  LCD_Out(97, 0);
+  LCD_Out(0x2B, 1);
+  LCD_Out(0, 0);
+  LCD_Out(66, 0);
+  LCD_Out(0x2C, 1);
+  
+  for (uint16_t i=0; i<6566; i++)
+  {
+    LCD_Out(snake_graphic_cmap[snake_graphic[i]],0);
+    //LCD_Out(white,0);
+  }
+}
 int main(void)
 { 
   uint8_t change_dir = 0;
@@ -294,6 +311,10 @@ int main(void)
   corners[head].y = 3;
   corners[tail].x = 3;
   corners[tail].y = 3;
+  
+  draw_graphic();
+  //StripedScreen();
+  while(1) {;;}
   
   Draw_Box(0,0,PAGE_SIZE,ROW_SIZE,black);
   Draw_Box(0,0,PAGE_SIZE-((PAGE_SIZE+1)%SNAKE_GIRTH),ROW_SIZE-((ROW_SIZE+1)%SNAKE_GIRTH),BACKGROUND);
