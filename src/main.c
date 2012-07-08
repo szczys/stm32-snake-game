@@ -19,8 +19,10 @@
 uint8_t game_running = 0;
 uint8_t font_cursor_x = 15;
 uint8_t font_cursor_y = 40;
-uint16_t tail = 0;
-uint16_t head = 1;
+uint16_t tail;
+uint16_t head;
+uint16_t snake_length_limit;
+uint16_t snake_length_current;
 
 typedef struct {
   uint8_t x;
@@ -28,9 +30,10 @@ typedef struct {
 } point;
 
 point corners[400];
-int8_t dirY = 0;
-int8_t dirX = 1;
-
+int8_t dirY;
+int8_t dirX;
+point fruit;
+uint8_t change_dir;
 
 //Variables
 static __IO uint32_t TimingDelay;
@@ -200,10 +203,16 @@ uint8_t neighbors(point node1, point node2)
 }
 
 void make_fruit(void) {
-  uint8_t randX = (uint8_t)(rand()%(GAMEBOARD_X));
-  uint8_t randY = (uint8_t)(rand()%(GAMEBOARD_Y));
+  fruit.x = (uint8_t)(rand()%(GAMEBOARD_X));
+  fruit.y = (uint8_t)(rand()%(GAMEBOARD_Y));
   //TODO: Make sure fruit isn't overlapping the snake.
-  Draw_Box(randX*SNAKE_GIRTH,randY*SNAKE_GIRTH,(randX*SNAKE_GIRTH)+SNAKE_GIRTH-1,(randY*SNAKE_GIRTH)+SNAKE_GIRTH-1,FRUIT_COLOR);
+  Draw_Box(fruit.x*SNAKE_GIRTH,fruit.y*SNAKE_GIRTH,(fruit.x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(fruit.y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FRUIT_COLOR);
+}
+
+uint8_t ate_fruit(uint8_t x, uint8_t y)
+{
+  if ((fruit.x == x) && (fruit.y == y)) return 1;
+  return 0;
 }
 
 void game_over(void)
@@ -235,11 +244,12 @@ void move_head(uint8_t new_dir)
   if ((corners[head].y == GAMEBOARD_Y-1) && (dirY == 1)) game_over();
   corners[head].x += dirX;
   corners[head].y += dirY;
+  ++snake_length_current;
 }
 
 void follow_tail(void)
 {
-
+  --snake_length_current;
   //is tail a neighbor of next?
   if (neighbors(corners[tail],corners[tail+1]))
   {
@@ -266,11 +276,11 @@ void follow_tail(void)
 
 uint8_t collision(void)
 {
-  uint8_t lower, upper, testpoint;
+  uint16_t lower, upper, testpoint;
 
   //Check to see if we hit part of the snake
   //traverse all nodes from tail forward
-  for (uint8_t i=tail; i<head-3; i++) 
+  for (uint16_t i=tail; i<head-3; i++) 
     //( check head-3 because you can't run into a segment any close than that to the head)
   {
     //check to see if head's x or y are shared with the current point
@@ -315,10 +325,17 @@ void draw_graphic(void) {
 
 void snake_init(void)
 {
-  corners[head].x = 15;
-  corners[head].y = 3;
-  corners[tail].x = 3;
-  corners[tail].y = 3;
+  tail = 0;
+  head = 1;
+  dirY = 0;
+  dirX = 1;
+  change_dir = 0;
+  snake_length_limit = 22;    //Change this to alter starting length
+  snake_length_current = snake_length_limit;
+  corners[head].x = 4+snake_length_current;
+  corners[head].y = 4;
+  corners[tail].x = 4;
+  corners[tail].y = 4;
   Draw_Box(0,0,PAGE_SIZE,ROW_SIZE,black);
   Draw_Box(0,0,PAGE_SIZE-((PAGE_SIZE+1)%SNAKE_GIRTH),ROW_SIZE-((ROW_SIZE+1)%SNAKE_GIRTH),BACKGROUND);
   Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND);
@@ -328,8 +345,6 @@ void snake_init(void)
 
 int main(void)
 { 
-  uint8_t change_dir = 0;
-
   SPI_Config();
 
   //Setup output for blinking blue LED  
@@ -359,9 +374,14 @@ int main(void)
 
       move_head(change_dir);
       Draw_Box(corners[head].x*SNAKE_GIRTH,corners[head].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND); //Redraw
+      if (ate_fruit(corners[head].x,corners[head].y))
+      {
+        snake_length_limit += (snake_length_limit/10);
+        make_fruit();
+      }
       if (collision()) game_over();
       Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[tail].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[tail].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,BACKGROUND); //Erase
-      follow_tail();
+      if (snake_length_current > snake_length_limit) follow_tail();
       
       
       
@@ -375,7 +395,7 @@ int main(void)
       { if (dirX == 0) change_dir = 3; } // Right { dirX = 1; dirY = 0; }
     if (get_key_press(1<<KEY3))
       { if (dirY == 0) change_dir = 4; } // Down { dirX = 0; dirY = 1; }
-    if (get_key_press(1<<KEY4)) 
+    if (get_key_press(1<<KEY4) && (game_running==0)) 
     {
       snake_init(); 
       game_running = 1;
