@@ -63,12 +63,53 @@ void Write_Char(unsigned char letter, unsigned char fgcolor, unsigned char bgcol
   }
 }
 
+void Double_Char(unsigned char letter, unsigned char fgcolor, unsigned char bgcolor)		//Function that writes one character to display
+{
+  //TODO: Prevent non-valid characters from crashing program
+  
+  //Setup display to write one char:
+  LCD_Out(0x2A, 1);
+  LCD_Out(font_cursor_x, 0);
+  LCD_Out(font_cursor_x+10, 0);
+  LCD_Out(0x2B, 1);
+  LCD_Out(font_cursor_y, 0);
+  LCD_Out(font_cursor_y+15, 0);
+  LCD_Out(0x2C, 1);
+  
+  //letters come from font5x8[] in progmem (font5x8.h)
+  letter -= 32;						//Adjust char value to match our font array indicies
+  
+  unsigned char temp[5];
+  for (unsigned char i=0; i<5; i++)				//Read one column of char at a time
+  {
+    temp[i] = font5x8[(5 * letter) + i];	//Get column from progmem
+  }
+
+  for (unsigned char j=0; j<8; j++)						//Cycle through each bit in column
+  {
+    LCD_Out(bgcolor, 0);
+
+    for (unsigned char k=0; k<5; k++)
+    {
+      if (temp[k] & 1<<j) { LCD_Out(fgcolor, 0); LCD_Out(fgcolor, 0); }
+	    else { LCD_Out(bgcolor, 0); LCD_Out(bgcolor, 0); }
+    }
+    LCD_Out(bgcolor, 0);    
+    for (unsigned char k=0; k<5; k++)
+    {
+      if (temp[k] & 1<<j) { LCD_Out(fgcolor, 0); LCD_Out(fgcolor, 0); }
+	    else { LCD_Out(bgcolor, 0); LCD_Out(bgcolor, 0); }
+    }
+  }
+}
+
 void Write_String(char* myString, unsigned char fgcolor, unsigned char bgcolor)
 {
   while (*myString)
   {
     Write_Char(*myString,fgcolor,bgcolor);
-    font_cursor_x += 6; //advance cursor
+    Double_Char(*myString,fgcolor,bgcolor);
+    font_cursor_x += 12; //advance cursor
     ++myString;
   }
 }
@@ -151,7 +192,7 @@ uint8_t neighbors(point node1, point node2)
 
 void game_over(void)
 {
-  Write_String("GAME OVER",FOREGROUND,BACKGROUND);
+  Write_String("OVER",FOREGROUND,BACKGROUND);
   while(1) {;;}
 }
 
