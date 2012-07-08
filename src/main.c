@@ -7,11 +7,14 @@
 
 #define BACKGROUND 0xFF
 #define FOREGROUND 0x00
+#define GAME_OVER_FONT_COLOR  red
+#define GAME_OVER_BD_COLOR  BACKGROUND
 
 #define SNAKE_GIRTH   2
 #define GAMEBOARD_X   (PAGE_SIZE+1)/SNAKE_GIRTH
 #define GAMEBOARD_Y   (ROW_SIZE+1)/SNAKE_GIRTH
 
+uint8_t game_running = 0;
 uint8_t font_cursor_x = 15;
 uint8_t font_cursor_y = 40;
 uint16_t tail = 0;
@@ -140,13 +143,15 @@ void TimingDelay_Decrement(void)
 void SysTick_Handler(void) {
   static uint16_t tick = 0;
   static uint16_t ten_ms_tick = 0;
-
-  switch (tick++) {
-    case 200:
-      tick = 0;
-      //GPIOC->ODR ^= (1 << 8);
-      move_tick = 1;
-      break;
+  
+  if (game_running)
+  {
+    switch (tick++) {
+      case 200:
+        tick = 0;
+        move_tick = 1;
+        break;
+    }
   }
   
   TimingDelay_Decrement();
@@ -193,8 +198,13 @@ uint8_t neighbors(point node1, point node2)
 
 void game_over(void)
 {
-  Write_String("OVER",FOREGROUND,BACKGROUND);
-  while(1) {;;}
+  font_cursor_x = ((PAGE_SIZE+1)/2)-((12*4)/2);
+  font_cursor_y = ((ROW_SIZE+1)/2)-17;
+  Write_String("GAME",GAME_OVER_FONT_COLOR,GAME_OVER_BD_COLOR);
+  font_cursor_x = ((PAGE_SIZE+1)/2)-((12*4)/2);
+  font_cursor_y = ((ROW_SIZE+1)/2)+1;
+  Write_String("OVER",GAME_OVER_FONT_COLOR,GAME_OVER_BD_COLOR);
+  game_running = 0;
 }
 
 void move_head(uint8_t new_dir)
@@ -292,6 +302,18 @@ void draw_graphic(void) {
     //LCD_Out(white,0);
   }
 }
+
+void snake_init(void)
+{
+  corners[head].x = 15;
+  corners[head].y = 3;
+  corners[tail].x = 3;
+  corners[tail].y = 3;
+  Draw_Box(0,0,PAGE_SIZE,ROW_SIZE,black);
+  Draw_Box(0,0,PAGE_SIZE-((PAGE_SIZE+1)%SNAKE_GIRTH),ROW_SIZE-((ROW_SIZE+1)%SNAKE_GIRTH),BACKGROUND);
+  Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND);
+}
+
 int main(void)
 { 
   uint8_t change_dir = 0;
@@ -300,25 +322,14 @@ int main(void)
 
   //Setup output for blinking blue LED  
   RCC->AHBENR |= RCC_AHBENR_GPIOCEN;   // enable the clock to GPIOC
-  GPIOC->MODER |= (1<<16);
-  GPIOC->PUPDR |= (1<<8) | (1<<4) | (1<<2) | (1<<0); //Pull-up resistor
+  //GPIOC->MODER |= (1<<16); //Deprecated, used to make blue LED blink
+  GPIOC->PUPDR |= (1<<10) | (1<<8) | (1<<4) | (1<<2) | (1<<0); //Pull-up resistor
   
   SysTick_Config(SystemCoreClock/1000);
   
   LCD_init();
-  
-  corners[head].x = 15;
-  corners[head].y = 3;
-  corners[tail].x = 3;
-  corners[tail].y = 3;
-  
-  draw_graphic();
-  //StripedScreen();
-  while(1) {;;}
-  
-  Draw_Box(0,0,PAGE_SIZE,ROW_SIZE,black);
-  Draw_Box(0,0,PAGE_SIZE-((PAGE_SIZE+1)%SNAKE_GIRTH),ROW_SIZE-((ROW_SIZE+1)%SNAKE_GIRTH),BACKGROUND);
-  Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND); //FIXME thickness hack
+   
+  draw_graphic();  
   
   clear_keys(REPEAT_MASK); //Clear false reading due to active high buttons
   while(1) {
@@ -352,5 +363,10 @@ int main(void)
       { if (dirX == 0) change_dir = 3; } // Right { dirX = 1; dirY = 0; }
     if (get_key_press(1<<KEY3))
       { if (dirY == 0) change_dir = 4; } // Down { dirX = 0; dirY = 1; }
+    if (get_key_press(1<<KEY4)) 
+    {
+      snake_init(); 
+      game_running = 1;
+    }
   }
 }
