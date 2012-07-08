@@ -7,6 +7,10 @@
 #define BACKGROUND 0xFF
 #define FOREGROUND 0x00
 
+#define SNAKE_GIRTH   2
+#define GAMEBOARD_X   (PAGE_SIZE+1)/SNAKE_GIRTH
+#define GAMEBOARD_Y   (ROW_SIZE+1)/SNAKE_GIRTH
+
 uint8_t font_cursor_x = 15;
 uint8_t font_cursor_y = 40;
 uint16_t tail = 0;
@@ -96,7 +100,7 @@ void SysTick_Handler(void) {
   static uint16_t ten_ms_tick = 0;
 
   switch (tick++) {
-    case 100:
+    case 200:
       tick = 0;
       //GPIOC->ODR ^= (1 << 8);
       move_tick = 1;
@@ -145,6 +149,12 @@ uint8_t neighbors(point node1, point node2)
   return 0;
 }
 
+void game_over(void)
+{
+  Write_String("GAME OVER",FOREGROUND,BACKGROUND);
+  while(1) {;;}
+}
+
 void move_head(uint8_t new_dir)
 {
   if (new_dir)
@@ -156,6 +166,11 @@ void move_head(uint8_t new_dir)
     change_direction(new_dir);  //change direction
   }
   
+  //Have we left the game board?
+  if ((corners[head].x == 0) && (dirX == -1)) game_over();
+  if ((corners[head].y == 0) && (dirY == -1)) game_over();
+  if ((corners[head].x == GAMEBOARD_X-1) && (dirX == 1)) game_over();
+  if ((corners[head].y == GAMEBOARD_Y-1) && (dirY == 1)) game_over();
   corners[head].x += dirX;
   corners[head].y += dirY;
 }
@@ -187,6 +202,38 @@ void follow_tail(void)
   }
 }
 
+uint8_t collision(void)
+{
+  uint8_t lower, upper, testpoint;
+
+  //Check to see if we hit part of the snake
+  //traverse all nodes from tail forward
+  for (uint8_t i=tail; i<head-3; i++) 
+    //( check head-3 because you can't run into a segment any close than that to the head)
+  {
+    //check to see if head's x or y are shared with the current point
+    if ((corners[head].x == corners[i].x) && (corners[i].x == corners[i+1].x))
+    {
+      //which point is the higher  number?
+      if (corners[i].y < corners[i+1].y) {lower = corners[i].y; upper = corners[i+1].y;}
+      else {lower = corners[i+1].y; upper = corners[i].y;}
+      testpoint = corners[head].y;
+    }
+    else if ((corners[head].y == corners[i].y) && (corners[i].y == corners[i+1].y))
+    {
+      //which point is the higher  number?
+      if (corners[i].x < corners[i+1].x) {lower = corners[i].x; upper = corners[i+1].x;}
+      else {lower = corners[i+1].x; upper = corners[i].x;}
+      testpoint = corners[head].x;
+    }
+    else continue;
+    
+    //Now check to see if head is a point between this node and the next
+    if ((lower<=testpoint) && (testpoint<= upper)) return 1;
+  }
+  return 0;
+}
+
 int main(void)
 { 
   uint8_t change_dir = 0;
@@ -202,14 +249,15 @@ int main(void)
   
   LCD_init();
   
-  corners[head].x = 40;
-  corners[head].y = 10;
-  corners[tail].x = 10;
-  corners[tail].y = 10;
+  corners[head].x = 15;
+  corners[head].y = 3;
+  corners[tail].x = 3;
+  corners[tail].y = 3;
   
-  Draw_Box(0,0,97,66,BACKGROUND);
-  Draw_Box(corners[tail].x,corners[tail].y,corners[head].x+1,corners[head].y+1,FOREGROUND); //FIXME thickness hack
-  Write_String("GAME OVER",FOREGROUND,BACKGROUND);
+  Draw_Box(0,0,PAGE_SIZE,ROW_SIZE,black);
+  Draw_Box(0,0,PAGE_SIZE-((PAGE_SIZE+1)%SNAKE_GIRTH),ROW_SIZE-((ROW_SIZE+1)%SNAKE_GIRTH),BACKGROUND);
+  Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND); //FIXME thickness hack
+  
   clear_keys(REPEAT_MASK); //Clear false reading due to active high buttons
   while(1) {
     if (move_tick) {
@@ -225,9 +273,13 @@ int main(void)
       //corners[head].y += dirY;
 
       move_head(change_dir);
-      Draw_Box(corners[head].x,corners[head].y,corners[head].x+1,corners[head].y+1,FOREGROUND); //Redraw
-      Draw_Box(corners[tail].x,corners[tail].y,corners[tail].x+1,corners[tail].y+1,BACKGROUND); //Erase
+      Draw_Box(corners[head].x*SNAKE_GIRTH,corners[head].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND); //Redraw
+      if (collision()) game_over();
+      Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[tail].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[tail].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,BACKGROUND); //Erase
       follow_tail();
+      
+      
+      
       move_tick = 0;
     }
     if (get_key_press(1<<KEY0)) 
