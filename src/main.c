@@ -168,9 +168,9 @@ void SysTick_Handler(void) {
   }
 }
 
-void change_direction(uint8_t new_dir)
+void change_direction(void)
 {
-  switch (new_dir) {
+  switch (change_dir) {
     case 1:
       dirX = -1;
       dirY = 0;
@@ -187,7 +187,8 @@ void change_direction(uint8_t new_dir)
       dirX = 0;
       dirY = 1;
       break;
-    }
+  }
+  change_dir = 0;
 }
 
 uint8_t absolute_difference(uint8_t a, uint8_t b)
@@ -234,7 +235,7 @@ void move_head(uint8_t new_dir)
     ++head; //increment head
     corners[head].x = corners[head-1].x;
     corners[head].y = corners[head-1].y;
-    change_direction(new_dir);  //change direction
+    change_direction();  //change direction
   }
   
   //Have we left the game board?
@@ -387,14 +388,10 @@ int main(void)
       
       move_tick = 0;
     }
-    if (get_key_press(1<<KEY0)) 
-      { if (dirX == 0) change_dir = 1; } // Left { dirX = -1; dirY = 0; }
-    if (get_key_press(1<<KEY1)) 
-      { if (dirY == 0) change_dir = 2; } // Up { dirX = 0; dirY = -1; }
-    if (get_key_press(1<<KEY2)) 
-      { if (dirX == 0) change_dir = 3; } // Right { dirX = 1; dirY = 0; }
-    if (get_key_press(1<<KEY3))
-      { if (dirY == 0) change_dir = 4; } // Down { dirX = 0; dirY = 1; }
+    if (get_key_press(1<<KEY0) && (dirX == 0)) change_dir = 1; // Left { dirX = -1; dirY = 0; }
+    if (get_key_press(1<<KEY1) && (dirY == 0)) change_dir = 2; // Up { dirX = 0; dirY = -1; }
+    if (get_key_press(1<<KEY2) && (dirX == 0)) change_dir = 3; // Right { dirX = 1; dirY = 0; }
+    if (get_key_press(1<<KEY3) && (dirY == 0)) change_dir = 4; // Down { dirX = 0; dirY = 1; }
     if (get_key_press(1<<KEY4) && (game_running==0)) 
     {
       snake_init(); 
