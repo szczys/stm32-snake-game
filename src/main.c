@@ -42,6 +42,7 @@ volatile uint8_t move_tick = 0;
 
 //Prototypes
 uint16_t get_next_node(uint16_t thisNode);
+uint16_t get_previous_node(uint16_t thisNode);
 uint16_t get_node_list_length(uint16_t node1, uint16_t node2);
 
 void Write_Char(unsigned char letter, unsigned char fgcolor, unsigned char bgcolor)		//Function that writes one character to display
@@ -238,8 +239,8 @@ void move_head(uint8_t new_dir)
   {
     //Copy head to new position
     head = get_next_node(head); //increment head
-    corners[head].x = corners[head-1].x;
-    corners[head].y = corners[head-1].y;
+    corners[head].x = corners[get_previous_node(head)].x;
+    corners[head].y = corners[get_previous_node(head)].y;
     change_direction();  //change direction
   }
   
