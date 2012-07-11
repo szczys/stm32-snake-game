@@ -13,6 +13,7 @@
 #define FRUIT_COLOR red
 
 #define SNAKE_GIRTH   2
+#define MAX_NODES     400
 #define GAMEBOARD_X   (PAGE_SIZE+1)/SNAKE_GIRTH
 #define GAMEBOARD_Y   (ROW_SIZE+1)/SNAKE_GIRTH
 
@@ -29,7 +30,7 @@ typedef struct {
   uint8_t y;
 } point;
 
-point corners[400];
+point corners[MAX_NODES];
 int8_t dirY;
 int8_t dirX;
 point fruit;
@@ -38,6 +39,10 @@ uint8_t change_dir;
 //Variables
 static __IO uint32_t TimingDelay;
 volatile uint8_t move_tick = 0;
+
+//Prototypes
+uint16_t get_next_node(uint16_t thisNode);
+uint16_t get_node_list_length(uint16_t node1, uint16_t node2);
 
 void Write_Char(unsigned char letter, unsigned char fgcolor, unsigned char bgcolor)		//Function that writes one character to display
 {
@@ -232,17 +237,17 @@ void move_head(uint8_t new_dir)
   if (new_dir)
   {
     //Copy head to new position
-    ++head; //increment head
+    head = get_next_node(head); //increment head
     corners[head].x = corners[head-1].x;
     corners[head].y = corners[head-1].y;
     change_direction();  //change direction
   }
   
   //Have we left the game board?
-  if ((corners[head].x == 0) && (dirX == -1)) game_over();
-  if ((corners[head].y == 0) && (dirY == -1)) game_over();
-  if ((corners[head].x == GAMEBOARD_X-1) && (dirX == 1)) game_over();
-  if ((corners[head].y == GAMEBOARD_Y-1) && (dirY == 1)) game_over();
+  if ((corners[head].x == 0) && (dirX == -1)) { game_over(); return; }
+  if ((corners[head].y == 0) && (dirY == -1)) { game_over(); return; }
+  if ((corners[head].x == GAMEBOARD_X-1) && (dirX == 1)) { game_over(); return; }
+  if ((corners[head].y == GAMEBOARD_Y-1) && (dirY == 1)) { game_over(); return; }
   corners[head].x += dirX;
   corners[head].y += dirY;
   ++snake_length_current;
@@ -254,7 +259,7 @@ void follow_tail(void)
   //is tail a neighbor of next?
   if (neighbors(corners[tail],corners[tail+1]))
   {
-    ++tail;
+    tail = get_next_node(tail);
   }
   
   //find which axis tail and next have in common
@@ -277,32 +282,40 @@ void follow_tail(void)
 
 uint8_t collision(void)
 {
-  uint16_t lower, upper, testpoint;
+  uint16_t lower = 0;
+  uint16_t upper = 0;
+  uint16_t testpoint = 1;
+  uint16_t i=tail;
+  uint16_t nextNode = get_next_node(i);;
 
   //Check to see if we hit part of the snake
   //traverse all nodes from tail forward
-  for (uint16_t i=tail; i<head-3; i++) 
+  for (int16_t count=get_node_list_length(tail,head)-3; count>0; count--)
+  //while (nextNode<head)
     //( check head-3 because you can't run into a segment any close than that to the head)
-  {
+  { 
     //check to see if head's x or y are shared with the current point
-    if ((corners[head].x == corners[i].x) && (corners[i].x == corners[i+1].x))
+    if ((corners[head].x == corners[i].x) && (corners[i].x == corners[nextNode].x))
     {
       //which point is the higher  number?
-      if (corners[i].y < corners[i+1].y) {lower = corners[i].y; upper = corners[i+1].y;}
-      else {lower = corners[i+1].y; upper = corners[i].y;}
+      if (corners[i].y < corners[nextNode].y) {lower = corners[i].y; upper = corners[nextNode].y;}
+      else {lower = corners[nextNode].y; upper = corners[i].y;}
       testpoint = corners[head].y;
     }
-    else if ((corners[head].y == corners[i].y) && (corners[i].y == corners[i+1].y))
+    else if ((corners[head].y == corners[i].y) && (corners[i].y == corners[nextNode].y))
     {
       //which point is the higher  number?
-      if (corners[i].x < corners[i+1].x) {lower = corners[i].x; upper = corners[i+1].x;}
-      else {lower = corners[i+1].x; upper = corners[i].x;}
+      if (corners[i].x < corners[nextNode].x) {lower = corners[i].x; upper = corners[nextNode].x;}
+      else {lower = corners[nextNode].x; upper = corners[i].x;}
       testpoint = corners[head].x;
     }
     else continue;
     
     //Now check to see if head is a point between this node and the next
     if ((lower<=testpoint) && (testpoint<= upper)) return 1;
+    
+    i = nextNode;
+    nextNode = get_next_node(i);
   }
   return 0;
 }
@@ -344,6 +357,31 @@ void snake_init(void)
   make_fruit();
 }
 
+/*--------------------------------------------------------------------------
+  FUNC: 7/11/12 - Gets index of next node in a ring buffer array
+  PARAMS: Current index
+  RETURNS: Next index (will go 'around the bend' if necessary)
+  NOTE: Depends on the constant MAX_NODES which defines size of array
+--------------------------------------------------------------------------*/
+uint16_t get_next_node(uint16_t thisNode) {
+  uint16_t nextNode = thisNode + 1;
+  if (nextNode >= MAX_NODES) nextNode = 0;
+  return nextNode;  
+}
+
+/*--------------------------------------------------------------------------
+  FUNC: 7/11/12 - Finds length in ring buffer from one node to the next
+  PARAMS: Index of first node, Index of second node
+  RETURNS: Total number of nodes (inclusive)
+  NOTE: Depends on the constant MAX_NODES which defines size of array
+        will go 'around the bend' if necessary
+--------------------------------------------------------------------------*/
+uint16_t get_node_list_length(uint16_t node1, uint16_t node2) {
+  if (node1 == node2) return 1;
+  if (node1 < node2) return (node2-node1)+1;  //Adding 1 to adjust for 0 index
+  else return node2+(MAX_NODES-node1)+1;    //Adding 1 to adjust for 0 index
+}
+
 int main(void)
 { 
   SPI_Config();
@@ -374,18 +412,21 @@ int main(void)
       //corners[head].y += dirY;
 
       move_head(change_dir);
-      Draw_Box(corners[head].x*SNAKE_GIRTH,corners[head].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND); //Redraw
       if (ate_fruit(corners[head].x,corners[head].y))
       {
         snake_length_limit += (snake_length_limit/10);
         make_fruit();
       }
       if (collision()) game_over();
-      Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[tail].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[tail].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,BACKGROUND); //Erase
-      if (snake_length_current > snake_length_limit) follow_tail();
-      
-      
-      
+      else {
+        Draw_Box(corners[head].x*SNAKE_GIRTH,corners[head].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND); //Redraw
+        if (snake_length_current > snake_length_limit)
+        {
+          
+          Draw_Box(corners[tail].x*SNAKE_GIRTH,corners[tail].y*SNAKE_GIRTH,(corners[tail].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[tail].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,BACKGROUND); //Erase
+          follow_tail();
+        }
+      }    
       move_tick = 0;
     }
     if (get_key_press(1<<KEY0) && (dirX == 0)) change_dir = 1; // Left { dirX = -1; dirY = 0; }
