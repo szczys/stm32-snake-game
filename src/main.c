@@ -257,7 +257,7 @@ void follow_tail(void)
 {
   --snake_length_current;
   //is tail a neighbor of next?
-  if (neighbors(corners[tail],corners[tail+1]))
+  if (neighbors(corners[tail],corners[get_next_node(tail)]))
   {
     tail = get_next_node(tail);
   }
@@ -265,16 +265,16 @@ void follow_tail(void)
   //find which axis tail and next have in common
   else
   {
-    if (corners[tail].x == corners[tail+1].x)
+    if (corners[tail].x == corners[get_next_node(tail)].x)
     {
       //These points have the same X, so make adjustment to the Y
-      if ((corners[tail].y - corners[tail+1].y) < 0) corners[tail].y += 1;
+      if ((corners[tail].y - corners[get_next_node(tail)].y) < 0) corners[tail].y += 1;
       else corners[tail].y -= 1; 
     }
     else
     {
       //These points have the same Y, so make adjustment to the X
-      if ((corners[tail].x - corners[tail+1].x) < 0) corners[tail].x += 1;
+      if ((corners[tail].x - corners[get_next_node(tail)].x) < 0) corners[tail].x += 1;
       else corners[tail].x -= 1; 
     }
   }
@@ -367,6 +367,17 @@ uint16_t get_next_node(uint16_t thisNode) {
   uint16_t nextNode = thisNode + 1;
   if (nextNode >= MAX_NODES) nextNode = 0;
   return nextNode;  
+}
+
+/*--------------------------------------------------------------------------
+  FUNC: 7/11/12 - Gets index of previous node in a ring buffer array
+  PARAMS: Current index
+  RETURNS: Previous index (will go 'around the bend' if necessary)
+  NOTE: Depends on the constant MAX_NODES which defines size of array
+--------------------------------------------------------------------------*/
+uint16_t get_previous_node(uint16_t thisNode) {
+  if (thisNode) return thisNode-1;  // thisNode is not zero so just decrement
+  return MAX_NODES-1; //thisNode is zero so go around the bend  
 }
 
 /*--------------------------------------------------------------------------
