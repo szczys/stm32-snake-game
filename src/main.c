@@ -44,6 +44,7 @@ volatile uint8_t move_tick = 0;
 uint16_t get_next_node(uint16_t thisNode);
 uint16_t get_previous_node(uint16_t thisNode);
 uint16_t get_node_list_length(uint16_t node1, uint16_t node2);
+uint8_t collision(point target);
 
 void Write_Char(unsigned char letter, unsigned char fgcolor, unsigned char bgcolor)		//Function that writes one character to display
 {
@@ -210,9 +211,11 @@ uint8_t neighbors(point node1, point node2)
 }
 
 void make_fruit(void) {
-  fruit.x = (uint8_t)(rand()%(GAMEBOARD_X));
-  fruit.y = (uint8_t)(rand()%(GAMEBOARD_Y));
-  //TODO: Make sure fruit isn't overlapping the snake.
+  while (1) {
+    fruit.x = (uint8_t)(rand()%(GAMEBOARD_X));
+    fruit.y = (uint8_t)(rand()%(GAMEBOARD_Y));
+    if (collision(fruit) == 0) break;
+  }
   Draw_Box(fruit.x*SNAKE_GIRTH,fruit.y*SNAKE_GIRTH,(fruit.x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(fruit.y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FRUIT_COLOR);
 }
 
@@ -281,7 +284,7 @@ void follow_tail(void)
   }
 }
 
-uint8_t collision(void)
+uint8_t collision(point target)
 {
   uint16_t lower = 0;
   uint16_t upper = 0;
@@ -296,21 +299,20 @@ uint8_t collision(void)
     //( check head-3 because you can't run into a segment any close than that to the head)
   { 
     //check to see if head's x or y are shared with the current point
-    if ((corners[head].x == corners[i].x) && (corners[i].x == corners[nextNode].x))
+    if ((target.x == corners[i].x) && (corners[i].x == corners[nextNode].x))
     {
       //which point is the higher  number?
       if (corners[i].y < corners[nextNode].y) {lower = corners[i].y; upper = corners[nextNode].y;}
       else {lower = corners[nextNode].y; upper = corners[i].y;}
-      testpoint = corners[head].y;
+      testpoint = target.y;
     }
-    else if ((corners[head].y == corners[i].y) && (corners[i].y == corners[nextNode].y))
+    else if ((target.y == corners[i].y) && (corners[i].y == corners[nextNode].y))
     {
       //which point is the higher  number?
       if (corners[i].x < corners[nextNode].x) {lower = corners[i].x; upper = corners[nextNode].x;}
       else {lower = corners[nextNode].x; upper = corners[i].x;}
-      testpoint = corners[head].x;
+      testpoint = target.x;
     }
-    else continue;
     
     //Now check to see if head is a point between this node and the next
     if ((lower<=testpoint) && (testpoint<= upper)) return 1;
@@ -429,7 +431,7 @@ int main(void)
         snake_length_limit += (snake_length_limit/10);
         make_fruit();
       }
-      if (collision()) game_over();
+      if (collision(corners[head])) game_over();
       else {
         Draw_Box(corners[head].x*SNAKE_GIRTH,corners[head].y*SNAKE_GIRTH,(corners[head].x*SNAKE_GIRTH)+SNAKE_GIRTH-1,(corners[head].y*SNAKE_GIRTH)+SNAKE_GIRTH-1,FOREGROUND); //Redraw
         if (snake_length_current > snake_length_limit)
